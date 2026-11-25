@@ -2,7 +2,7 @@
 import logging
 from homeassistant.core import callback
 from homeassistant.components.hassio.addon_manager import AddonError, AddonManager, AddonState
-from .inventory import ROLES, inventory
+from .inventory import ROLES
 import voluptuous as vol
 from homeassistant import config_entries
 from homeassistant.components.hassio.coordinator import get_addons_list
@@ -32,16 +32,23 @@ class NodOptionsFlow(config_entries.OptionsFlow):
 
     async def async_step_init(self, user_input=None):
         prefix = self.config_entry.data["prefix"]
-        apps = inventory(get_addons_list(self.hass), prefix)
-        missing = [role for role in ("Browser", "Workspace") if apps[role] is None]
+        managers = {
+            role: AddonManager(self.hass, logging.getLogger(__name__), role, f"{prefix}_{ROLES[role]}")
+            for role in ("Browser", "Workspace")
+        }
+        try:
+            missing = [role for role, manager in managers.items()
+                       if (await manager.async_get_addon_info()).state is AddonState.NOT_INSTALLED]
+        except AddonError:
+            return self.async_show_form(step_id="init", errors={"base": "install_failed"},
+                                        data_schema=vol.Schema({}))
         if not missing:
             return self.async_abort(reason="complete")
         errors = {}
         if user_input is not None:
             role = user_input.get("component")
             if role in missing:
-                slug = f"{prefix}_{ROLES[role]}"
-                manager = AddonManager(self.hass, logging.getLogger(__name__), role, slug)
+                manager = managers[role]
                 try:
                     info = await manager.async_get_addon_info()
                     if info.state is AddonState.NOT_INSTALLED and info.available:
