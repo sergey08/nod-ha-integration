@@ -12,5 +12,22 @@
       "no_server": "No se ha encontrado el servidor de Nod.",
       "already_configured": "Servidor ya configurado."
     }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Instalar componente",
+        "description": "Elige la aplicación que Supervisor debe instalar. Su configuración y arranque se realizan por separado.",
+        "data": {
+          "component": "Componente disponible para instalar"
+        }
+      }
+    },
+    "abort": {
+      "complete": "Browser y Workspace ya están instalados."
+    },
+    "error": {
+      "install_failed": "Supervisor no pudo instalar el componente. Revisa la tienda de aplicaciones."
+    }
   }
 }

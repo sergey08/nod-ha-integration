@@ -12,5 +12,22 @@
       "no_server": "No installed Nod server found.",
       "already_configured": "Server already configured."
     }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Install component",
+        "description": "Select the app for Supervisor to install. Configure and start it separately.",
+        "data": {
+          "component": "Component to install"
+        }
+      }
+    },
+    "abort": {
+      "complete": "Browser and Workspace are already installed."
+    },
+    "error": {
+      "install_failed": "Supervisor could not install this component. Check the app store."
+    }
   }
 }
