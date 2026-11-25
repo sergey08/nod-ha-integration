@@ -1,0 +1,16 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Nod",
+        "data": {
+          "server": "Servidor instalado"
+        }
+      }
+    },
+    "abort": {
+      "no_server": "No se ha encontrado el servidor de Nod.",
+      "already_configured": "Servidor ya configurado."
+    }
+  }
+}
