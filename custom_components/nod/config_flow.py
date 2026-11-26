@@ -38,7 +38,7 @@ class NodOptionsFlow(config_entries.OptionsFlow):
         }
         try:
             missing = [role for role, manager in managers.items()
-                       if (await manager.async_get_addon_info()).state is AddonState.NOT_INSTALLED]
+                       if (await manager.async_get_addon_info()).state in (AddonState.NOT_INSTALLED, AddonState.NOT_RUNNING)]
         except AddonError:
             return self.async_show_form(step_id="init", errors={"base": "install_failed"},
                                         data_schema=vol.Schema({}))
@@ -55,6 +55,27 @@ class NodOptionsFlow(config_entries.OptionsFlow):
                         await manager.async_install_addon()
                     elif info.state is AddonState.NOT_INSTALLED:
                         raise AddonError("Component unavailable")
+                    info = await manager.async_get_addon_info()
+                    if info.state is AddonState.NOT_RUNNING:
+                        server = AddonManager(self.hass, logging.getLogger(__name__), "Server", f"{prefix}_{ROLES['Server']}")
+                        parent = await server.async_get_addon_info()
+                        key_name = role.lower()
+                        key = parent.options.get(f"{key_name}_key")
+                        if (not key or not parent.hostname or not info.hostname
+                                or parent.options.get(f"{key_name}_host") != info.hostname):
+                            raise AddonError("Server pairing is unavailable")
+                        options = dict(info.options)
+                        if options.get("remote_key") not in (None, "", key):
+                            raise AddonError("Existing pairing differs")
+                        options.update(remote_enabled=True, remote_key=key, server_host=parent.hostname)
+                        if role == "Workspace":
+                            options["command_enabled"] = bool(parent.options.get("workspace_runtime_enabled"))
+                        elif not parent.options.get("browser_enabled"):
+                            raise AddonError("Server browser disabled")
+                        await manager.async_set_addon_options(options)
+                        await manager.async_start_addon()
+                    if (await manager.async_get_addon_info()).state is not AddonState.RUNNING:
+                        raise AddonError("Component did not start")
                     return self.async_create_entry(title="", data={})
                 except AddonError:
                     errors["base"] = "install_failed"

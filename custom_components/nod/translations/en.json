@@ -17,14 +17,14 @@
     "step": {
       "init": {
         "title": "Install component",
-        "description": "Select the app for Supervisor to install. Configure and start it separately.",
+        "description": "Select the component to install or start using the existing server pairing.",
         "data": {
           "component": "Component to install"
         }
       }
     },
     "abort": {
-      "complete": "Browser and Workspace are already installed."
+      "complete": "Browser and Workspace are running."
     },
     "error": {
       "install_failed": "Supervisor could not install this component. Check the app store."
