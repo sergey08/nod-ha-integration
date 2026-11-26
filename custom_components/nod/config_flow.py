@@ -28,18 +28,22 @@ class NodFlow(config_entries.ConfigFlow, domain="nod"):
         return self.async_create_entry(title="Nod", data={"prefix": slug.removesuffix(suffix)})
 
     async def async_step_install(self, user_input=None):
+        progress = {'stage': 'initialization'}
+        detail = ''
         errors = {}
         if user_input is not None:
-            from .bootstrap import provision
             try:
-                prefix = await provision(self.hass)
-            except Exception:
+                from .bootstrap import provision
+                prefix = await provision(self.hass, progress)
+            except Exception as err:
+                detail = f"{progress['stage']} ({type(err).__name__})"
+                logging.getLogger(__name__).warning('Nod setup failed at %s', detail)
                 errors["base"] = "bootstrap_failed"
             else:
                 await self.async_set_unique_id(f"{prefix}_nod_native_preflight")
                 self._abort_if_unique_id_configured()
                 return self.async_create_entry(title="Nod", data={"prefix": prefix})
-        return self.async_show_form(step_id="install", errors=errors,
+        return self.async_show_form(step_id="install", errors=errors, description_placeholders={"detail": detail},
                                     data_schema=vol.Schema({}))
 
 class NodOptionsFlow(config_entries.OptionsFlow):

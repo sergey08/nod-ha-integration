@@ -9,7 +9,7 @@
       },
       "install": {
         "title": "Instalar Nod",
-        "description": "Añade el repositorio experimental e instala, empareja y arranca Server, Browser y Workspace. El acceso HTTPS al chat requiere configuración adicional."
+        "description": "Añade el repositorio experimental e instala, empareja y arranca Server, Browser y Workspace. El acceso HTTPS al chat requiere configuración adicional. {detail}"
       }
     },
     "abort": {
