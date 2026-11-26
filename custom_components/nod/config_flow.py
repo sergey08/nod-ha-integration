@@ -19,13 +19,28 @@ class NodFlow(config_entries.ConfigFlow, domain="nod"):
         suffix = "_nod_native_preflight"
         servers = sorted(app["slug"] for app in get_addons_list(self.hass) if app["slug"].endswith(suffix))
         if not servers:
-            return self.async_abort(reason="no_server")
+            return await self.async_step_install()
         if user_input is None or user_input.get("server") not in servers:
             return self.async_show_form(step_id="user", data_schema=vol.Schema({vol.Required("server", default=servers[0]): vol.In(servers)}))
         slug = user_input["server"]
         await self.async_set_unique_id(slug)
         self._abort_if_unique_id_configured()
         return self.async_create_entry(title="Nod", data={"prefix": slug.removesuffix(suffix)})
+
+    async def async_step_install(self, user_input=None):
+        errors = {}
+        if user_input is not None:
+            from .bootstrap import provision
+            try:
+                prefix = await provision(self.hass)
+            except Exception:
+                errors["base"] = "bootstrap_failed"
+            else:
+                await self.async_set_unique_id(f"{prefix}_nod_native_preflight")
+                self._abort_if_unique_id_configured()
+                return self.async_create_entry(title="Nod", data={"prefix": prefix})
+        return self.async_show_form(step_id="install", errors=errors,
+                                    data_schema=vol.Schema({}))
 
 class NodOptionsFlow(config_entries.OptionsFlow):
     """Offer installation only for missing workers of the adopted server."""
