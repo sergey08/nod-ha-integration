@@ -9,7 +9,7 @@
       },
       "install": {
         "title": "Install Nod",
-        "description": "Add the experimental repository, install, pair and start Server, Browser and Workspace. HTTPS chat access requires additional setup."
+        "description": "Add the experimental repository, install, pair and start Server, Browser and Workspace. HTTPS chat access requires additional setup. {detail}"
       }
     },
     "abort": {

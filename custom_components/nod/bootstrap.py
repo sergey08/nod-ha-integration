@@ -10,7 +10,8 @@ from .inventory import ROLES
 
 SOURCE = "https://github.com/sergey08/homeassistant-addons#feat/nod-home-assistant"
 
-async def provision(hass):
+async def provision(hass, progress):
+    progress['stage'] = 'Supervisor / repository'
     store = get_supervisor_client(hass).store
     repos = await store.repositories_list()
     if not any(r.source == SOURCE for r in repos):
@@ -26,15 +27,18 @@ async def provision(hass):
     # A cancelled worker installation must not appear as an adoptable server.
     for role in ("Workspace", "Browser", "Server"):
         manager = managers[role]
+        progress['stage'] = f'{stage} / {role}'
         info = await manager.async_get_addon_info()
         if info.state is AddonState.NOT_INSTALLED:
             if not info.available:
                 raise AddonError("Unsupported app")
+            progress['stage'] = f'{stage} / {role}'
             await manager.async_install_addon()
             info = await manager.async_get_addon_info()
         if info.state not in (AddonState.NOT_RUNNING, AddonState.RUNNING):
             raise AddonError("App installation has not completed")
         infos[role] = info
+    progress["stage"] = "pairing"
     server = infos["Server"]
     options = dict(server.options)
     if not server.hostname or any(not info.hostname for info in infos.values()):
@@ -61,9 +65,11 @@ async def provision(hass):
             raise AddonError("Cannot change an active installation")
     for role, config in desired.items():
         if infos[role].options != config:
+            progress['stage'] = f'{stage} / {role}'
             await managers[role].async_set_addon_options(config)
     for role in ("Workspace", "Browser", "Server"):
         if infos[role].state is AddonState.NOT_RUNNING:
+            progress['stage'] = f'{stage} / {role}'
             await managers[role].async_start_addon()
         if (await managers[role].async_get_addon_info()).state is not AddonState.RUNNING:
             raise AddonError("App has not started")
