@@ -23,13 +23,17 @@ async def provision(hass):
     managers = {role: AddonManager(hass, logging.getLogger(__name__), role,
                                   f"{repo.slug}_{suffix}") for role, suffix in ROLES.items()}
     infos = {}
-    for role, manager in managers.items():
+    # A cancelled worker installation must not appear as an adoptable server.
+    for role in ("Workspace", "Browser", "Server"):
+        manager = managers[role]
         info = await manager.async_get_addon_info()
         if info.state is AddonState.NOT_INSTALLED:
             if not info.available:
                 raise AddonError("Unsupported app")
             await manager.async_install_addon()
             info = await manager.async_get_addon_info()
+        if info.state not in (AddonState.NOT_RUNNING, AddonState.RUNNING):
+            raise AddonError("App installation has not completed")
         infos[role] = info
     server = infos["Server"]
     options = dict(server.options)
