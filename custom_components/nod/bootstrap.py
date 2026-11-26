@@ -27,12 +27,12 @@ async def provision(hass, progress):
     # A cancelled worker installation must not appear as an adoptable server.
     for role in ("Workspace", "Browser", "Server"):
         manager = managers[role]
-        progress['stage'] = f'{stage} / {role}'
+        progress['stage'] = f'inspect / {role}'
         info = await manager.async_get_addon_info()
         if info.state is AddonState.NOT_INSTALLED:
             if not info.available:
                 raise AddonError("Unsupported app")
-            progress['stage'] = f'{stage} / {role}'
+            progress['stage'] = f'install / {role}'
             await manager.async_install_addon()
             info = await manager.async_get_addon_info()
         if info.state not in (AddonState.NOT_RUNNING, AddonState.RUNNING):
@@ -65,11 +65,11 @@ async def provision(hass, progress):
             raise AddonError("Cannot change an active installation")
     for role, config in desired.items():
         if infos[role].options != config:
-            progress['stage'] = f'{stage} / {role}'
+            progress['stage'] = f'configure / {role}'
             await managers[role].async_set_addon_options(config)
     for role in ("Workspace", "Browser", "Server"):
         if infos[role].state is AddonState.NOT_RUNNING:
-            progress['stage'] = f'{stage} / {role}'
+            progress['stage'] = f'start / {role}'
             await managers[role].async_start_addon()
         if (await managers[role].async_get_addon_info()).state is not AddonState.RUNNING:
             raise AddonError("App has not started")
