@@ -6,11 +6,18 @@
         "data": {
           "server": "Installed server"
         }
+      },
+      "install": {
+        "title": "Install Nod",
+        "description": "Add the experimental repository, install, pair and start Server, Browser and Workspace. HTTPS chat access requires additional setup."
       }
     },
     "abort": {
       "no_server": "No installed Nod server found.",
       "already_configured": "Server already configured."
+    },
+    "error": {
+      "bootstrap_failed": "Installation could not finish. Check app status in Supervisor before retrying."
     }
   },
   "options": {

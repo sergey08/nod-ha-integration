@@ -6,11 +6,18 @@
         "data": {
           "server": "Servidor instalado"
         }
+      },
+      "install": {
+        "title": "Instalar Nod",
+        "description": "Añade el repositorio experimental e instala, empareja y arranca Server, Browser y Workspace. El acceso HTTPS al chat requiere configuración adicional."
       }
     },
     "abort": {
       "no_server": "No se ha encontrado el servidor de Nod.",
       "already_configured": "Servidor ya configurado."
+    },
+    "error": {
+      "bootstrap_failed": "No se pudo completar la instalación. Comprueba el estado de las aplicaciones en Supervisor antes de reintentar."
     }
   },
   "options": {
