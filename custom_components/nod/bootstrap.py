@@ -60,6 +60,8 @@ async def provision(hass, progress):
             config["command_enabled"] = True
         worker_options[role] = config
     options.update(browser_enabled=True, workspace_runtime_enabled=True)
+    if "ingress_chat" in options and not options.get("https_enabled"):
+        options["ingress_chat"] = True
     desired = {"Server": options, **worker_options}
     for role, config in desired.items():
         if infos[role].options != config and infos[role].state is not AddonState.NOT_RUNNING:
