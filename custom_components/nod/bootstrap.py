@@ -2,7 +2,7 @@
 import logging
 import secrets
 
-from aiohasupervisor.models.addons import StoreAddRepository
+from aiohasupervisor.models.addons import AddonsOptions, StoreAddRepository
 from homeassistant.components.hassio.addon_manager import AddonError, AddonManager, AddonState
 from homeassistant.components.hassio.handler import get_supervisor_client
 
@@ -12,7 +12,8 @@ SOURCE = "https://github.com/sergey08/homeassistant-addons#feat/nod-home-assista
 
 async def provision(hass, progress):
     progress['stage'] = 'Supervisor / repository'
-    store = get_supervisor_client(hass).store
+    client = get_supervisor_client(hass)
+    store = client.store
     repos = await store.repositories_list()
     if not any(r.source == SOURCE for r in repos):
         await store.add_repository(StoreAddRepository(repository=SOURCE))
@@ -59,6 +60,8 @@ async def provision(hass, progress):
             config["command_enabled"] = True
         worker_options[role] = config
     options.update(browser_enabled=True, workspace_runtime_enabled=True)
+    if "ingress_chat" in options and not options.get("https_enabled"):
+        options["ingress_chat"] = True
     desired = {"Server": options, **worker_options}
     for role, config in desired.items():
         if infos[role].options != config and infos[role].state is not AddonState.NOT_RUNNING:
@@ -73,4 +76,8 @@ async def provision(hass, progress):
             await managers[role].async_start_addon()
         if (await managers[role].async_get_addon_info()).state is not AddonState.RUNNING:
             raise AddonError("App has not started")
+    progress["stage"] = "show server in sidebar"
+    await client.addons.set_addon_options(
+        f"{repo.slug}_{ROLES['Server']}", AddonsOptions(ingress_panel=True)
+    )
     return repo.slug
