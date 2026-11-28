@@ -157,9 +157,13 @@ class NodOptionsFlow(config_entries.OptionsFlow):
                     "detail": self._upgrade_error,
                 },
             )
-        return self.async_abort(
-            reason="upgrade_complete",
+        if user_input is not None:
+            return self.async_create_entry(title="", data=dict(self.config_entry.options))
+        return self.async_show_form(
+            step_id="upgrade_result",
+            data_schema=vol.Schema({}),
             description_placeholders={"backup": self._upgrade.backup_id},
+            last_step=True,
         )
 
     async def async_step_install_component(self, user_input=None):

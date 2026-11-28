@@ -42,6 +42,10 @@
         "data": {
           "component": "Component to install"
         }
+      },
+      "upgrade_result": {
+        "title": "Nod updated",
+        "description": "The Nod apps are updated and their previous running states were verified. Backup ID {backup}."
       }
     },
     "abort": {
@@ -53,7 +57,6 @@
       "busy_or_unavailable": "One of the Nod apps is unavailable or busy. Wait for Supervisor to finish and try again.",
       "upgrade_running": "A Nod update is already in progress.",
       "upgrade_failed": "The update stopped at {stage} ({detail}). Backup ID {backup}. Check the app versions in Supervisor, then reopen these options to resume.",
-      "upgrade_complete": "The Nod apps are updated and their previous running states were verified. Backup ID {backup}.",
       "untrusted_catalog": "The installed Nod apps belong to a catalog without verified coordinated updates.",
       "manifest_unavailable": "The Nod update manifest is temporarily unavailable. Try again when Home Assistant can reach GitHub.",
       "invalid_manifest": "The Nod catalog returned an invalid update manifest.",

@@ -42,6 +42,10 @@
         "data": {
           "component": "Componente disponible para instalar"
         }
+      },
+      "upgrade_result": {
+        "title": "Nod actualizado",
+        "description": "Se actualizaron las aplicaciones de Nod y se verificó su estado de ejecución anterior. ID de copia {backup}."
       }
     },
     "abort": {
@@ -53,7 +57,6 @@
       "busy_or_unavailable": "Una aplicación de Nod está ocupada o no está disponible. Espera a que termine Supervisor y vuelve a intentarlo.",
       "upgrade_running": "Ya hay una actualización de Nod en curso.",
       "upgrade_failed": "La actualización se detuvo en {stage} ({detail}). ID de copia {backup}. Comprueba las versiones en Supervisor y vuelve a estas opciones para reanudarla.",
-      "upgrade_complete": "Se actualizaron las aplicaciones de Nod y se verificó su estado de ejecución anterior. ID de copia {backup}.",
       "untrusted_catalog": "Las aplicaciones instaladas pertenecen a un catálogo sin actualizaciones coordinadas verificadas.",
       "manifest_unavailable": "El manifiesto de actualización de Nod no está disponible. Reintenta cuando Home Assistant tenga acceso a GitHub.",
       "invalid_manifest": "El catálogo de Nod devolvió un manifiesto de actualización inválido.",
