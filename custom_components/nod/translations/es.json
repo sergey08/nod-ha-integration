@@ -23,6 +23,20 @@
   "options": {
     "step": {
       "init": {
+        "title": "Gestionar Nod",
+        "menu_options": {
+          "upgrade": "Actualizar Nod",
+          "install_component": "Instalar o iniciar un worker"
+        }
+      },
+      "upgrade": {
+        "title": "Actualizar Nod",
+        "description": "{versions}\n\nNod se detendrá brevemente mientras Supervisor verifica una copia y actualiza las tres aplicaciones. Si se interrumpió un intento anterior, se usará su copia original.",
+        "data": {
+          "confirm": "Crear o verificar la copia y aplicar estas versiones"
+        }
+      },
+      "install_component": {
         "title": "Instalar componente",
         "description": "Selecciona el componente que quieres instalar o arrancar con la configuración del servidor existente.",
         "data": {
@@ -31,10 +45,22 @@
       }
     },
     "abort": {
-      "complete": "Browser y Workspace están en ejecución."
+      "complete": "Browser y Workspace están en ejecución.",
+      "up_to_date": "Ya están instaladas las tres versiones verificadas de Nod.",
+      "upgrade_inspection_failed": "Supervisor no pudo consultar las tres aplicaciones de Nod. Revisa la tienda e instala primero los workers que falten.",
+      "catalog_changed": "Supervisor no ofrece las versiones esperadas para las tres aplicaciones de Nod. Revisa el catálogo antes de actualizar.",
+      "unsupported_versions": "Las versiones instaladas no coinciden con la actualización compatible ni con su punto de recuperación guardado.",
+      "busy_or_unavailable": "Una aplicación de Nod está ocupada o no está disponible. Espera a que termine Supervisor y vuelve a intentarlo.",
+      "upgrade_running": "Ya hay una actualización de Nod en curso.",
+      "upgrade_failed": "La actualización se detuvo en {stage} ({detail}). ID de copia {backup}. Comprueba las versiones en Supervisor y vuelve a estas opciones para reanudarla.",
+      "upgrade_complete": "Se actualizaron las aplicaciones de Nod y se verificó su estado de ejecución anterior. ID de copia {backup}."
     },
     "error": {
-      "install_failed": "Supervisor no pudo instalar el componente. Revisa la tienda de aplicaciones."
+      "install_failed": "Supervisor no pudo instalar el componente. Revisa la tienda de aplicaciones.",
+      "versions_changed": "Han cambiado las versiones instaladas. Revisa el nuevo conjunto y vuelve a confirmar."
+    },
+    "progress": {
+      "upgrading": "Supervisor está haciendo la copia y actualizando las aplicaciones de Nod. Si se interrumpe el proceso, puedes volver a estas opciones para comprobarlo o reanudarlo."
     }
   }
 }

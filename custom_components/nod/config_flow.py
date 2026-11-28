@@ -1,4 +1,5 @@
-"""Adopt an installed native Nod server."""
+"""Install or manage the Nod apps for Home Assistant."""
+import asyncio
 import logging
 from homeassistant.core import callback
 from homeassistant.components.hassio.addon_manager import AddonError, AddonManager, AddonState
@@ -6,6 +7,12 @@ from .inventory import ROLES
 import voluptuous as vol
 from homeassistant import config_entries
 from homeassistant.components.hassio.coordinator import get_addons_list
+from homeassistant.components.hassio.handler import get_supervisor_client
+from homeassistant.helpers.storage import Store
+
+from .upgrade import NodUpgrade, TARGET, UpgradeBlocked
+
+_LOGGER = logging.getLogger(__name__)
 
 class NodFlow(config_entries.ConfigFlow, domain="nod"):
     VERSION = 1
@@ -47,9 +54,94 @@ class NodFlow(config_entries.ConfigFlow, domain="nod"):
                                     data_schema=vol.Schema({}))
 
 class NodOptionsFlow(config_entries.OptionsFlow):
-    """Offer installation only for missing workers of the adopted server."""
+    """Manage the adopted server and its paired workers."""
 
     async def async_step_init(self, user_input=None):
+        return self.async_show_menu(step_id="init", menu_options=["upgrade", "install_component"])
+
+    async def async_step_upgrade(self, user_input=None):
+        prefix = self.config_entry.data["prefix"]
+        store = Store(self.hass, 1, f"nod.{self.config_entry.entry_id}.upgrade")
+        upgrade = NodUpgrade(get_supervisor_client(self.hass), store, prefix)
+        try:
+            apps = await upgrade.inspect()
+            pending = await store.async_load()
+        except Exception as err:
+            _LOGGER.warning("Could not inspect Nod upgrade (%s)", type(err).__name__)
+            return self.async_abort(reason="upgrade_inspection_failed")
+
+        installed = upgrade.versions(apps)
+        if installed == TARGET and not pending:
+            return self.async_abort(reason="up_to_date")
+        try:
+            upgrade.check(apps, pending)
+        except UpgradeBlocked as err:
+            return self.async_abort(reason=str(err))
+
+        errors = {}
+        if user_input and user_input.get("confirm"):
+            if getattr(self, "_reviewed_versions", None) == installed:
+                locks = self.hass.data.setdefault("nod_upgrade_locks", {})
+                lock = locks.setdefault(prefix, asyncio.Lock())
+                if lock.locked():
+                    return self.async_abort(reason="upgrade_running")
+                self._upgrade = upgrade
+                self._upgrade_error = None
+                self._upgrade_task = self.hass.async_create_task(
+                    self._run_upgrade(lock, installed), "Nod coordinated upgrade"
+                )
+                return await self.async_step_upgrade_progress()
+            errors["base"] = "versions_changed"
+
+        self._reviewed_versions = installed
+        summary = ", ".join(f"{role} {version} → {TARGET[role]}" for role, version in installed.items())
+        return self.async_show_form(
+            step_id="upgrade",
+            data_schema=vol.Schema({vol.Required("confirm", default=False): bool}),
+            description_placeholders={"versions": summary},
+            errors=errors,
+        )
+
+    async def _run_upgrade(self, lock, installed):
+        if lock.locked():
+            self._upgrade_error = "upgrade_running"
+            return
+        async with lock:
+            try:
+                await self._upgrade.run(installed)
+            except UpgradeBlocked as err:
+                self._upgrade_error = str(err)
+            except Exception as err:
+                self._upgrade_error = "operation_failed"
+                _LOGGER.warning("Nod upgrade stopped at %s (%s)", self._upgrade.stage, type(err).__name__)
+
+    async def async_step_upgrade_progress(self, user_input=None):
+        if self._upgrade_task.done():
+            if self._upgrade_task.cancelled():
+                self._upgrade_error = "operation_failed"
+            return self.async_show_progress_done(next_step_id="upgrade_result")
+        return self.async_show_progress(
+            step_id="upgrade_progress",
+            progress_action="upgrading",
+            progress_task=self._upgrade_task,
+        )
+
+    async def async_step_upgrade_result(self, user_input=None):
+        if self._upgrade_error:
+            return self.async_abort(
+                reason="upgrade_failed",
+                description_placeholders={
+                    "stage": self._upgrade.stage,
+                    "backup": self._upgrade.backup_id or "—",
+                    "detail": self._upgrade_error,
+                },
+            )
+        return self.async_abort(
+            reason="upgrade_complete",
+            description_placeholders={"backup": self._upgrade.backup_id},
+        )
+
+    async def async_step_install_component(self, user_input=None):
         prefix = self.config_entry.data["prefix"]
         managers = {
             role: AddonManager(self.hass, logging.getLogger(__name__), role, f"{prefix}_{ROLES[role]}")
@@ -59,7 +151,7 @@ class NodOptionsFlow(config_entries.OptionsFlow):
             missing = [role for role, manager in managers.items()
                        if (await manager.async_get_addon_info()).state in (AddonState.NOT_INSTALLED, AddonState.NOT_RUNNING)]
         except AddonError:
-            return self.async_show_form(step_id="init", errors={"base": "install_failed"},
+            return self.async_show_form(step_id="install_component", errors={"base": "install_failed"},
                                         data_schema=vol.Schema({}))
         if not missing:
             return self.async_abort(reason="complete")
@@ -98,6 +190,6 @@ class NodOptionsFlow(config_entries.OptionsFlow):
                     return self.async_create_entry(title="", data={})
                 except AddonError:
                     errors["base"] = "install_failed"
-        return self.async_show_form(step_id="init", errors=errors, data_schema=vol.Schema({
+        return self.async_show_form(step_id="install_component", errors=errors, data_schema=vol.Schema({
             vol.Required("component", default=missing[0]): vol.In(missing),
         }))
