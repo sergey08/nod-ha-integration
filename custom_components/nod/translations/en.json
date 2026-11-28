@@ -23,18 +23,51 @@
   "options": {
     "step": {
       "init": {
+        "title": "Manage Nod",
+        "menu_options": {
+          "upgrade": "Update Nod",
+          "install_component": "Install or start a worker"
+        }
+      },
+      "upgrade": {
+        "title": "Update Nod",
+        "description": "Nod {upstream}\n\n{versions}\n\nNod will stop briefly while Supervisor verifies a backup and updates the three apps. If a previous attempt was interrupted, this uses its original backup.",
+        "data": {
+          "confirm": "Create or verify the backup and apply this version set"
+        }
+      },
+      "install_component": {
         "title": "Install component",
         "description": "Select the component to install or start using the existing server pairing.",
         "data": {
           "component": "Component to install"
         }
+      },
+      "upgrade_result": {
+        "title": "Nod updated",
+        "description": "The Nod apps are updated and their previous running states were verified. Backup ID {backup}."
       }
     },
     "abort": {
-      "complete": "Browser and Workspace are running."
+      "complete": "Browser and Workspace are running.",
+      "up_to_date": "The verified Nod version set is already installed.",
+      "upgrade_inspection_failed": "Supervisor could not read all three installed Nod apps. Check the app store and install missing workers first.",
+      "catalog_changed": "Supervisor is not offering the expected versions for all three Nod apps. Check the catalog before updating.",
+      "unsupported_versions": "The installed Nod versions do not match the supported upgrade or its saved recovery point.",
+      "busy_or_unavailable": "One of the Nod apps is unavailable or busy. Wait for Supervisor to finish and try again.",
+      "upgrade_running": "A Nod update is already in progress.",
+      "upgrade_failed": "The update stopped at {stage} ({detail}). Backup ID {backup}. Check the app versions in Supervisor, then reopen these options to resume.",
+      "untrusted_catalog": "The installed Nod apps belong to a catalog without verified coordinated updates.",
+      "manifest_unavailable": "The Nod update manifest is temporarily unavailable. Try again when Home Assistant can reach GitHub.",
+      "invalid_manifest": "The Nod catalog returned an invalid update manifest.",
+      "recovery_plan_changed": "The catalog no longer offers the saved update plan. Backup ID {backup}. Check Supervisor before continuing."
     },
     "error": {
-      "install_failed": "Supervisor could not install this component. Check the app store."
+      "install_failed": "Supervisor could not install this component. Check the app store.",
+      "versions_changed": "The plan or installed versions changed. Review the updated plan and confirm again."
+    },
+    "progress": {
+      "upgrading": "Supervisor is backing up and updating the Nod apps. Reopen these options to check or resume after an interruption."
     }
   }
 }

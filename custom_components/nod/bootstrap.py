@@ -7,8 +7,7 @@ from homeassistant.components.hassio.addon_manager import AddonError, AddonManag
 from homeassistant.components.hassio.handler import get_supervisor_client
 
 from .inventory import ROLES
-
-SOURCE = "https://github.com/sergey08/homeassistant-addons#feat/nod-home-assistant"
+from .release import SOURCE
 
 async def provision(hass, progress):
     progress['stage'] = 'Supervisor / repository'
