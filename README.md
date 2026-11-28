@@ -2,6 +2,10 @@
 
 Experimental integration for an existing Nod installation on Home Assistant OS. Add Nod in Devices & services to see the installed versions and open the existing server panel. Requires the native server app. Browser and Workspace are optional.
 
+### Start Nod automatically
+
+In Home Assistant, go to **Settings → Apps**. Open the **Info** tab for each Nod app (Server, Browser and Workspace) and turn on **Start on boot** so all three start after a restart. An app can be running now with this switch off. If two sets are installed, enable it on the set you use regularly.
+
 ### Coordinated update
 
 In the Nod integration's options, select **Update Nod**. Review the three installed and target versions and confirm. The first supported upgrade is Server dev.34 and both workers dev.6 to Server dev.35 and both workers dev.7 (Nod 0.10.3). The Nod catalog supplies the approved migrations through its upstream manifest on GitHub. Supervisor must offer the exact target for each of the three adopted apps. When a future release adds a validated transition, the integration can offer it with the same update button.
@@ -11,6 +15,10 @@ Supervisor stops the apps and creates a local partial backup before changing any
 ## Español
 
 Integración experimental para una instalación existente de Nod en Home Assistant OS. Añade Nod en Dispositivos y servicios para consultar las versiones y abrir el panel del servidor existente. Requiere la aplicación del servidor nativo. Browser y Workspace son opcionales.
+
+### Iniciar Nod automáticamente
+
+En Home Assistant, ve a **Configuración → Aplicaciones**. Abre la pestaña **Información** de cada aplicación de Nod (Server, Browser y Workspace) y activa **Iniciar en el arranque** para que las tres se inicien tras reiniciar. Una aplicación puede estar en ejecución con ese interruptor desactivado. Si tienes dos conjuntos instalados, actívalo en el que usas habitualmente.
 
 ### Actualización coordinada
 
