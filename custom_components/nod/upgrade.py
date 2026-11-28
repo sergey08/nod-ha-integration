@@ -35,9 +35,10 @@ class AppVersion:
 class NodUpgrade:
     """Update an adopted set of apps and retain recovery state across HA restarts."""
 
-    def __init__(self, client, store, prefix):
+    def __init__(self, client, store, prefix, *, backup_password=None):
         self.client = client
         self.store = store
+        self.backup_password = backup_password
         self.slugs = {role: f"{prefix}_{name}" for role, name in ROLES.items()}
         self.stage = "preflight"
         self.backup_id = None
@@ -78,7 +79,9 @@ class NodUpgrade:
                 raise UpgradeBlocked("stop_failed")
 
     async def _start(self, roles, expected):
-        for role in roles:
+        for role in UPDATE_ORDER:
+            if role not in roles:
+                continue
             self.stage = f"start / {role}"
             slug = self.slugs[role]
             current = await self.client.addons.addon_info(slug)
@@ -94,8 +97,17 @@ class NodUpgrade:
         self.stage = "verify backup"
         details = await self.client.backups.backup_info(self.backup_id)
         expected = {slug: BASELINE[role] for role, slug in self.slugs.items()}
-        if {app.slug: app.version for app in details.addons} != expected:
+        location = details.location_attributes.get(".local")
+        if (
+            details.type != "partial"
+            or details.homeassistant is not None
+            or details.folders
+            or {app.slug: app.version for app in details.addons} != expected
+            or not location
+            or location.size_bytes <= 0
+        ):
             raise UpgradeBlocked("backup_incomplete")
+        return location
 
     async def run(self, reviewed_versions):
         """Apply the reviewed set, or resume a previous attempt with its original backup."""
@@ -129,13 +141,16 @@ class NodUpgrade:
                         name="Nod before upgrade to 0.10.3",
                         addons=set(self.slugs.values()),
                         location=".local",
+                        password=self.backup_password,
                         background=False,
                     )
                 )
                 self.backup_id = backup.slug
                 if not self.backup_id:
                     raise UpgradeBlocked("backup_incomplete")
-                await self._check_backup()
+                location = await self._check_backup()
+                if self.backup_password and not location.protected:
+                    raise UpgradeBlocked("backup_not_protected")
                 await self.store.async_save({**pending, "backup_id": self.backup_id})
             else:
                 await self._check_backup()
@@ -158,7 +173,7 @@ class NodUpgrade:
                 raise UpgradeBlocked("versions_changed")
             if apps[role].installed != TARGET[role]:
                 slug = self.slugs[role]
-                await self.client.store.update_addon(slug, StoreAddonUpdate(backup=False))
+                await self.client.store.update_addon(slug, StoreAddonUpdate(backup=False, background=False))
                 current = await self.client.addons.addon_info(slug)
                 if current.version != TARGET[role] or current.state != "stopped":
                     raise UpgradeBlocked("update_failed")

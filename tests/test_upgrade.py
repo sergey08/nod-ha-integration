@@ -10,10 +10,7 @@ def load_upgrade():
     root = Path("custom_components/nod").resolve()
     package = ModuleType("test_nod")
     package.__path__ = [str(root)]
-    supervisor = ModuleType("aiohasupervisor.models")
-    supervisor.PartialBackupOptions = SimpleNamespace
-    supervisor.StoreAddonUpdate = SimpleNamespace
-    with patch.dict(sys.modules, {"test_nod": package, "aiohasupervisor.models": supervisor}):
+    with patch.dict(sys.modules, {"test_nod": package}):
         return importlib.import_module("test_nod.upgrade")
 
 
@@ -42,6 +39,8 @@ class Supervisor:
         self.events = []
         self.fail = None
         self.incomplete_backup = False
+        self.local_backup = True
+        self.protected_backup = None
         self.backup_apps = []
         self.slugs = {f"test_{suffix}": role for role, suffix in upgrade.ROLES.items()}
 
@@ -69,6 +68,8 @@ class Supervisor:
         assert options.location == ".local" and not options.background
         assert set(self.states.values()) == {"stopped"}
         self.events.append(("backup", None))
+        if self.protected_backup is None:
+            self.protected_backup = bool(options.password)
         self.backup_apps = [
             SimpleNamespace(slug=slug, version=self.installed[role])
             for slug, role in self.slugs.items()
@@ -78,11 +79,19 @@ class Supervisor:
 
     async def backup_info(self, slug):
         assert slug == "backup1"
-        return SimpleNamespace(addons=self.backup_apps)
+        return SimpleNamespace(
+            addons=self.backup_apps,
+            type="partial",
+            location_attributes={
+                ".local": SimpleNamespace(size_bytes=4096, protected=self.protected_backup)
+            } if self.local_backup else {},
+            homeassistant=None,
+            folders=[],
+        )
 
     async def update_addon(self, slug, options):
         role = self.slugs[slug]
-        assert not options.backup
+        assert not options.backup and not options.background
         assert set(self.states.values()) == {"stopped"}
         if self.fail == role:
             raise RuntimeError("synthetic interrupted update")
@@ -103,7 +112,7 @@ class CoordinatedUpgradeTest(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(self.supervisor.events, [
             ("stop", "Server"), ("stop", "Workspace"), ("backup", None),
             ("update", "Workspace"), ("update", "Browser"), ("update", "Server"),
-            ("start", "Server"), ("start", "Workspace"),
+            ("start", "Workspace"), ("start", "Server"),
         ])
         self.assertIsNone(self.store.data)
 
@@ -118,6 +127,23 @@ class CoordinatedUpgradeTest(unittest.IsolatedAsyncioTestCase):
         self.supervisor.incomplete_backup = True
         with self.assertRaisesRegex(upgrade.UpgradeBlocked, "backup_incomplete"):
             await self.job.run(upgrade.BASELINE)
+        self.assertEqual(self.supervisor.installed, upgrade.BASELINE)
+        self.assertEqual(set(self.supervisor.states.values()), {"started"})
+        self.assertIsNone(self.store.data["backup_id"])
+
+    async def test_copy_missing_from_local_storage_blocks_updates(self):
+        self.supervisor.local_backup = False
+        with self.assertRaisesRegex(upgrade.UpgradeBlocked, "backup_incomplete"):
+            await self.job.run(upgrade.BASELINE)
+        self.assertEqual(self.supervisor.installed, upgrade.BASELINE)
+        self.assertEqual(set(self.supervisor.states.values()), {"started"})
+        self.assertIsNone(self.store.data["backup_id"])
+
+    async def test_refuses_unprotected_backup_when_a_password_was_supplied(self):
+        self.supervisor.protected_backup = False
+        job = upgrade.NodUpgrade(self.supervisor, self.store, "test", backup_password="synthetic")
+        with self.assertRaisesRegex(upgrade.UpgradeBlocked, "backup_not_protected"):
+            await job.run(upgrade.BASELINE)
         self.assertEqual(self.supervisor.installed, upgrade.BASELINE)
         self.assertEqual(set(self.supervisor.states.values()), {"started"})
         self.assertIsNone(self.store.data["backup_id"])

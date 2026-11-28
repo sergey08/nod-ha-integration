@@ -6,8 +6,10 @@ from homeassistant.components.hassio.addon_manager import AddonError, AddonManag
 from .inventory import ROLES
 import voluptuous as vol
 from homeassistant import config_entries
+from homeassistant.components.backup import async_get_manager as async_get_backup_manager
 from homeassistant.components.hassio.coordinator import get_addons_list
 from homeassistant.components.hassio.handler import get_supervisor_client
+from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.storage import Store
 
 from .upgrade import NodUpgrade, TARGET, UpgradeBlocked
@@ -85,7 +87,9 @@ class NodOptionsFlow(config_entries.OptionsFlow):
                 lock = locks.setdefault(prefix, asyncio.Lock())
                 if lock.locked():
                     return self.async_abort(reason="upgrade_running")
-                self._upgrade = upgrade
+                self._upgrade = NodUpgrade(
+                    upgrade.client, store, prefix, backup_password=self._backup_password()
+                )
                 self._upgrade_error = None
                 self._upgrade_task = self.hass.async_create_task(
                     self._run_upgrade(lock, installed), "Nod coordinated upgrade"
@@ -101,6 +105,18 @@ class NodOptionsFlow(config_entries.OptionsFlow):
             description_placeholders={"versions": summary},
             errors=errors,
         )
+
+    def _backup_password(self):
+        """Use the configured password when the local backup location is protected."""
+        try:
+            config = async_get_backup_manager(self.hass).config.data
+        except HomeAssistantError:
+            return None
+
+        local = config.agents.get("hassio.local")
+        if local is not None and not local.protected:
+            return None
+        return config.create_backup.password
 
     async def _run_upgrade(self, lock, installed):
         if lock.locked():
