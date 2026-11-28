@@ -1,0 +1,19 @@
+name: Tag Lenovo integration test
+on:
+  push:
+    branches: [test/prepare-lenovo-b10]
+    paths: [.github/workflows/tag-lenovo-test.yml]
+permissions:
+  contents: write
+jobs:
+  tag:
+    if: github.repository == 'sergey08/nod-ha-integration'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Tag the checked integration commit
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh api "repos/$GITHUB_REPOSITORY/git/refs" --method POST \
+            --field ref=refs/tags/v0.1.0b10 \
+            --field sha=61243810eaaf20185878c6de30ed8b7130cc7d05
