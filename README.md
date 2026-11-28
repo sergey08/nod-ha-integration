@@ -1,6 +1,6 @@
 # Nod for Home Assistant
 
-Experimental integration for an existing Nod installation on Home Assistant OS. Add Nod in Devices & services to see the installed versions and open the existing server panel. Requires the native server app. Browser and Workspace are optional.
+Release 1.0.0 of the Home Assistant integration works with Nod upstream 0.10.3. The verified app set is Server `0.1.0-dev.35`, Browser `0.1.0-dev.7` and Workspace `0.1.0-dev.7`. Add Nod in **Settings → Devices & services**. The integration can install and pair the three apps on a fresh setup or adopt an existing Nod Server.
 
 ### Start Nod automatically
 
@@ -14,7 +14,7 @@ Supervisor stops the apps and creates a local partial backup before changing any
 
 ## Español
 
-Integración experimental para una instalación existente de Nod en Home Assistant OS. Añade Nod en Dispositivos y servicios para consultar las versiones y abrir el panel del servidor existente. Requiere la aplicación del servidor nativo. Browser y Workspace son opcionales.
+La versión 1.0.0 de la integración de Home Assistant funciona con Nod upstream 0.10.3. Las versiones verificadas de las aplicaciones son Server `0.1.0-dev.35`, Browser `0.1.0-dev.7` y Workspace `0.1.0-dev.7`. Añade Nod en **Configuración → Dispositivos y servicios**. La integración puede instalar y emparejar las tres aplicaciones en una instalación nueva o adoptar un servidor Nod existente.
 
 ### Iniciar Nod automáticamente
 
