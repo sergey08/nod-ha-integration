@@ -31,7 +31,7 @@
       },
       "upgrade": {
         "title": "Update Nod",
-        "description": "{versions}\n\nNod will stop briefly while Supervisor verifies a backup and updates the three apps. If a previous attempt was interrupted, this uses its original backup.",
+        "description": "Nod {upstream}\n\n{versions}\n\nNod will stop briefly while Supervisor verifies a backup and updates the three apps. If a previous attempt was interrupted, this uses its original backup.",
         "data": {
           "confirm": "Create or verify the backup and apply this version set"
         }
@@ -53,11 +53,15 @@
       "busy_or_unavailable": "One of the Nod apps is unavailable or busy. Wait for Supervisor to finish and try again.",
       "upgrade_running": "A Nod update is already in progress.",
       "upgrade_failed": "The update stopped at {stage} ({detail}). Backup ID {backup}. Check the app versions in Supervisor, then reopen these options to resume.",
-      "upgrade_complete": "The Nod apps are updated and their previous running states were verified. Backup ID {backup}."
+      "upgrade_complete": "The Nod apps are updated and their previous running states were verified. Backup ID {backup}.",
+      "untrusted_catalog": "The installed Nod apps belong to a catalog without verified coordinated updates.",
+      "manifest_unavailable": "The Nod update manifest is temporarily unavailable. Try again when Home Assistant can reach GitHub.",
+      "invalid_manifest": "The Nod catalog returned an invalid update manifest.",
+      "recovery_plan_changed": "The catalog no longer offers the saved update plan. Backup ID {backup}. Check Supervisor before continuing."
     },
     "error": {
       "install_failed": "Supervisor could not install this component. Check the app store.",
-      "versions_changed": "The installed versions changed. Review the updated version set and confirm again."
+      "versions_changed": "The plan or installed versions changed. Review the updated plan and confirm again."
     },
     "progress": {
       "upgrading": "Supervisor is backing up and updating the Nod apps. Reopen these options to check or resume after an interruption."

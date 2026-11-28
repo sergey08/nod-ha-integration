@@ -31,7 +31,7 @@
       },
       "upgrade": {
         "title": "Actualizar Nod",
-        "description": "{versions}\n\nNod se detendrá brevemente mientras Supervisor verifica una copia y actualiza las tres aplicaciones. Si se interrumpió un intento anterior, se usará su copia original.",
+        "description": "Nod {upstream}\n\n{versions}\n\nNod se detendrá brevemente mientras Supervisor verifica una copia y actualiza las tres aplicaciones. Si se interrumpió un intento anterior, se usará su copia original.",
         "data": {
           "confirm": "Crear o verificar la copia y aplicar estas versiones"
         }
@@ -53,11 +53,15 @@
       "busy_or_unavailable": "Una aplicación de Nod está ocupada o no está disponible. Espera a que termine Supervisor y vuelve a intentarlo.",
       "upgrade_running": "Ya hay una actualización de Nod en curso.",
       "upgrade_failed": "La actualización se detuvo en {stage} ({detail}). ID de copia {backup}. Comprueba las versiones en Supervisor y vuelve a estas opciones para reanudarla.",
-      "upgrade_complete": "Se actualizaron las aplicaciones de Nod y se verificó su estado de ejecución anterior. ID de copia {backup}."
+      "upgrade_complete": "Se actualizaron las aplicaciones de Nod y se verificó su estado de ejecución anterior. ID de copia {backup}.",
+      "untrusted_catalog": "Las aplicaciones instaladas pertenecen a un catálogo sin actualizaciones coordinadas verificadas.",
+      "manifest_unavailable": "El manifiesto de actualización de Nod no está disponible. Reintenta cuando Home Assistant tenga acceso a GitHub.",
+      "invalid_manifest": "El catálogo de Nod devolvió un manifiesto de actualización inválido.",
+      "recovery_plan_changed": "El catálogo ya no ofrece el plan de actualización guardado. ID de la copia {backup}. Comprueba el estado de Supervisor antes de continuar."
     },
     "error": {
       "install_failed": "Supervisor no pudo instalar el componente. Revisa la tienda de aplicaciones.",
-      "versions_changed": "Han cambiado las versiones instaladas. Revisa el nuevo conjunto y vuelve a confirmar."
+      "versions_changed": "Ha cambiado el plan o alguna versión instalada. Revisa el plan actualizado y confirma otra vez."
     },
     "progress": {
       "upgrading": "Supervisor está haciendo la copia y actualizando las aplicaciones de Nod. Si se interrumpe el proceso, puedes volver a estas opciones para comprobarlo o reanudarlo."

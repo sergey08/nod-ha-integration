@@ -5,7 +5,7 @@ from aiohasupervisor import SupervisorClient
 from aiohttp import web
 from aiohttp.test_utils import TestServer
 
-from test_upgrade import MemoryStore, Supervisor, upgrade
+from test_upgrade import BASELINE, PLAN, TARGET, MemoryStore, Supervisor, upgrade
 
 
 class SupervisorHTTPTest(unittest.IsolatedAsyncioTestCase):
@@ -122,9 +122,9 @@ class SupervisorHTTPTest(unittest.IsolatedAsyncioTestCase):
     async def test_coordinated_update_through_the_real_client(self):
         async with SupervisorClient(self.url, "synthetic-token") as client:
             job = upgrade.NodUpgrade(client, self.store, "test", backup_password="synthetic-backup-password")
-            await job.run(upgrade.BASELINE)
+            await job.run(BASELINE, PLAN)
 
-        self.assertEqual(self.supervisor.installed, upgrade.TARGET)
+        self.assertEqual(self.supervisor.installed, TARGET)
         self.assertEqual(self.supervisor.events, [
             ("stop", "Server"), ("stop", "Browser"), ("stop", "Workspace"),
             ("backup", None),

@@ -11,10 +11,13 @@ def load_upgrade():
     package = ModuleType("test_nod")
     package.__path__ = [str(root)]
     with patch.dict(sys.modules, {"test_nod": package}):
-        return importlib.import_module("test_nod.upgrade")
+        return importlib.import_module("test_nod.upgrade"), importlib.import_module("test_nod.release")
 
 
-upgrade = load_upgrade()
+upgrade, release = load_upgrade()
+PLAN = release.LEGACY_PLAN
+BASELINE = PLAN.baseline
+TARGET = PLAN.target
 
 
 class MemoryStore:
@@ -33,8 +36,8 @@ class MemoryStore:
 class Supervisor:
     def __init__(self):
         self.addons = self.store = self.backups = self
-        self.installed = upgrade.BASELINE.copy()
-        self.offers = upgrade.TARGET.copy()
+        self.installed = BASELINE.copy()
+        self.offers = TARGET.copy()
         self.states = {role: "started" for role in self.installed}
         self.events = []
         self.fail = None
@@ -107,8 +110,8 @@ class CoordinatedUpgradeTest(unittest.IsolatedAsyncioTestCase):
 
     async def test_snapshots_all_three_before_updates_and_preserves_running_states(self):
         self.supervisor.states["Browser"] = "stopped"
-        await self.job.run(upgrade.BASELINE)
-        self.assertEqual(self.supervisor.installed, upgrade.TARGET)
+        await self.job.run(BASELINE, PLAN)
+        self.assertEqual(self.supervisor.installed, TARGET)
         self.assertEqual(self.supervisor.events, [
             ("stop", "Server"), ("stop", "Workspace"), ("backup", None),
             ("update", "Workspace"), ("update", "Browser"), ("update", "Server"),
@@ -117,25 +120,25 @@ class CoordinatedUpgradeTest(unittest.IsolatedAsyncioTestCase):
         self.assertIsNone(self.store.data)
 
     async def test_does_not_run_against_a_partial_catalog(self):
-        self.supervisor.offers["Browser"] = upgrade.BASELINE["Browser"]
+        self.supervisor.offers["Browser"] = BASELINE["Browser"]
         with self.assertRaisesRegex(upgrade.UpgradeBlocked, "catalog_changed"):
-            await self.job.run(upgrade.BASELINE)
+            await self.job.run(BASELINE, PLAN)
         self.assertEqual(self.supervisor.events, [])
         self.assertIsNone(self.store.data)
 
     async def test_incomplete_backup_blocks_changes_and_restarts_old_apps(self):
         self.supervisor.incomplete_backup = True
         with self.assertRaisesRegex(upgrade.UpgradeBlocked, "backup_incomplete"):
-            await self.job.run(upgrade.BASELINE)
-        self.assertEqual(self.supervisor.installed, upgrade.BASELINE)
+            await self.job.run(BASELINE, PLAN)
+        self.assertEqual(self.supervisor.installed, BASELINE)
         self.assertEqual(set(self.supervisor.states.values()), {"started"})
         self.assertIsNone(self.store.data["backup_id"])
 
     async def test_copy_missing_from_local_storage_blocks_updates(self):
         self.supervisor.local_backup = False
         with self.assertRaisesRegex(upgrade.UpgradeBlocked, "backup_incomplete"):
-            await self.job.run(upgrade.BASELINE)
-        self.assertEqual(self.supervisor.installed, upgrade.BASELINE)
+            await self.job.run(BASELINE, PLAN)
+        self.assertEqual(self.supervisor.installed, BASELINE)
         self.assertEqual(set(self.supervisor.states.values()), {"started"})
         self.assertIsNone(self.store.data["backup_id"])
 
@@ -143,36 +146,36 @@ class CoordinatedUpgradeTest(unittest.IsolatedAsyncioTestCase):
         self.supervisor.protected_backup = False
         job = upgrade.NodUpgrade(self.supervisor, self.store, "test", backup_password="synthetic")
         with self.assertRaisesRegex(upgrade.UpgradeBlocked, "backup_not_protected"):
-            await job.run(upgrade.BASELINE)
-        self.assertEqual(self.supervisor.installed, upgrade.BASELINE)
+            await job.run(BASELINE, PLAN)
+        self.assertEqual(self.supervisor.installed, BASELINE)
         self.assertEqual(set(self.supervisor.states.values()), {"started"})
         self.assertIsNone(self.store.data["backup_id"])
 
     async def test_resume_uses_the_original_backup_after_partial_update(self):
         self.supervisor.fail = "Browser"
         with self.assertRaises(RuntimeError):
-            await self.job.run(upgrade.BASELINE)
-        self.assertEqual(self.supervisor.installed["Workspace"], upgrade.TARGET["Workspace"])
+            await self.job.run(BASELINE, PLAN)
+        self.assertEqual(self.supervisor.installed["Workspace"], TARGET["Workspace"])
         self.assertEqual(self.store.data["backup_id"], "backup1")
         self.assertEqual(set(self.supervisor.states.values()), {"stopped"})
 
         self.supervisor.fail = None
         resumed = upgrade.NodUpgrade(self.supervisor, self.store, "test")
-        await resumed.run(self.supervisor.installed.copy())
+        await resumed.run(self.supervisor.installed.copy(), PLAN)
         self.assertEqual(self.supervisor.events.count(("backup", None)), 1)
         self.assertEqual(self.supervisor.events.count(("update", "Workspace")), 1)
-        self.assertEqual(self.supervisor.installed, upgrade.TARGET)
+        self.assertEqual(self.supervisor.installed, TARGET)
         self.assertIsNone(self.store.data)
 
     async def test_never_adopts_an_untracked_partial_upgrade(self):
-        self.supervisor.installed["Browser"] = upgrade.TARGET["Browser"]
+        self.supervisor.installed["Browser"] = TARGET["Browser"]
         with self.assertRaisesRegex(upgrade.UpgradeBlocked, "unsupported_versions"):
-            await self.job.run(self.supervisor.installed.copy())
+            await self.job.run(self.supervisor.installed.copy(), PLAN)
         self.assertEqual(self.supervisor.events, [])
 
     async def test_rejects_an_installed_version_that_changed_after_review(self):
         with self.assertRaisesRegex(upgrade.UpgradeBlocked, "versions_changed"):
-            await self.job.run(upgrade.TARGET)
+            await self.job.run(TARGET, PLAN)
         self.assertEqual(self.supervisor.events, [])
 
     async def test_rechecks_catalog_after_each_component_update(self):
@@ -180,11 +183,52 @@ class CoordinatedUpgradeTest(unittest.IsolatedAsyncioTestCase):
 
         async def change_offer_after_update(slug, options):
             await update_addon(slug, options)
-            self.supervisor.offers["Browser"] = upgrade.BASELINE["Browser"]
+            self.supervisor.offers["Browser"] = BASELINE["Browser"]
 
         self.supervisor.update_addon = change_offer_after_update
         with self.assertRaisesRegex(upgrade.UpgradeBlocked, "catalog_changed"):
-            await self.job.run(upgrade.BASELINE)
+            await self.job.run(BASELINE, PLAN)
         updates = [role for event, role in self.supervisor.events if event == "update"]
         self.assertEqual(updates, ["Workspace"])
+        self.assertEqual(self.store.data["backup_id"], "backup1")
+
+    async def test_applies_a_future_manifest_plan_with_an_unchanged_worker(self):
+        self.supervisor.installed = TARGET.copy()
+        self.supervisor.offers = {
+            "Server": "0.1.0-dev.36", "Browser": "0.1.0-dev.7", "Workspace": "0.1.0-dev.8",
+        }
+        manifest = release.parse_manifest({
+            "repository": "n8n-io/nod", "tag": "nod-v0.11.0", "revision": "1" * 40,
+            "ha_upgrade": {
+                "schema": 1, "target": self.supervisor.offers, "supported_from": [TARGET],
+            },
+        })
+        plan = manifest.select(self.supervisor.installed, None)
+        await self.job.run(TARGET, plan)
+        self.assertEqual(self.supervisor.installed, plan.target)
+        self.assertEqual([role for event, role in self.supervisor.events if event == "update"],
+                         ["Workspace", "Server"])
+        self.assertEqual({app.version for app in self.supervisor.backup_apps}, set(TARGET.values()))
+        self.assertIsNone(self.store.data)
+
+    async def test_resumes_a_legacy_journal_with_the_same_approved_plan(self):
+        self.supervisor.fail = "Browser"
+        with self.assertRaises(RuntimeError):
+            await self.job.run(BASELINE, PLAN)
+        self.store.data["target"] = self.store.data.pop("plan")["target"]
+        self.supervisor.fail = None
+        resumed = upgrade.NodUpgrade(self.supervisor, self.store, "test")
+        await resumed.run(self.supervisor.installed.copy(), PLAN)
+        self.assertEqual(self.supervisor.events.count(("backup", None)), 1)
+        self.assertEqual(self.supervisor.installed, TARGET)
+
+    async def test_refuses_a_recovery_plan_that_changed_after_review(self):
+        self.store.data = {
+            "plan": {**PLAN.record(), "revision": "1" * 40},
+            "running": ["Server", "Browser", "Workspace"],
+            "backup_id": "backup1",
+        }
+        with self.assertRaisesRegex(upgrade.UpgradeBlocked, "recovery_plan_changed"):
+            await self.job.run(BASELINE, PLAN)
+        self.assertEqual(self.supervisor.events, [])
         self.assertEqual(self.store.data["backup_id"], "backup1")

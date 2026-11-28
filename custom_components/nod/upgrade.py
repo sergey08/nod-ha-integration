@@ -5,22 +5,9 @@ from dataclasses import dataclass
 from aiohasupervisor.models import PartialBackupOptions, StoreAddonUpdate
 
 from .inventory import ROLES
+from .release import UpgradeBlocked, recovery_matches
 
-BASELINE = {
-    "Server": "0.1.0-dev.34",
-    "Browser": "0.1.0-dev.6",
-    "Workspace": "0.1.0-dev.6",
-}
-TARGET = {
-    "Server": "0.1.0-dev.35",
-    "Browser": "0.1.0-dev.7",
-    "Workspace": "0.1.0-dev.7",
-}
 UPDATE_ORDER = ("Workspace", "Browser", "Server")
-
-
-class UpgradeBlocked(Exception):
-    """The catalog, installed apps or backup do not meet the upgrade preconditions."""
 
 
 @dataclass(frozen=True)
@@ -59,14 +46,14 @@ class NodUpgrade:
     def versions(apps):
         return {role: app.installed for role, app in apps.items()}
 
-    def check(self, apps, pending):
+    def check(self, apps, plan, has_backup):
         """Refuse arbitrary version combinations and offers below installed versions."""
         if any(app.state not in ("started", "stopped") for app in apps.values()):
             raise UpgradeBlocked("busy_or_unavailable")
-        if any(app.offered != TARGET[role] for role, app in apps.items()):
+        if any(app.offered != plan.target[role] for role, app in apps.items()):
             raise UpgradeBlocked("catalog_changed")
-        allowed = TARGET if pending and pending.get("backup_id") else BASELINE
-        if any(app.installed not in (BASELINE[role], allowed[role]) for role, app in apps.items()):
+        allowed = plan.target if has_backup else plan.baseline
+        if any(app.installed not in (plan.baseline[role], allowed[role]) for role, app in apps.items()):
             raise UpgradeBlocked("unsupported_versions")
 
     async def _stop(self, apps):
@@ -93,10 +80,10 @@ class NodUpgrade:
             if current.version != expected[role] or current.state != "started":
                 raise UpgradeBlocked("start_failed")
 
-    async def _check_backup(self):
+    async def _check_backup(self, baseline):
         self.stage = "verify backup"
         details = await self.client.backups.backup_info(self.backup_id)
-        expected = {slug: BASELINE[role] for role, slug in self.slugs.items()}
+        expected = {slug: baseline[role] for role, slug in self.slugs.items()}
         location = details.location_attributes.get(".local")
         if (
             details.type != "partial"
@@ -109,15 +96,15 @@ class NodUpgrade:
             raise UpgradeBlocked("backup_incomplete")
         return location
 
-    async def run(self, reviewed_versions):
+    async def run(self, reviewed_versions, plan):
         """Apply the reviewed set, or resume a previous attempt with its original backup."""
         pending = await self.store.async_load()
-        if pending:
-            if pending.get("target") != TARGET:
-                raise UpgradeBlocked("unsupported_versions")
+        if pending is not None:
+            if not recovery_matches(pending, plan):
+                raise UpgradeBlocked("recovery_plan_changed")
             self.backup_id = pending.get("backup_id")
         apps = await self.inspect()
-        self.check(apps, pending)
+        self.check(apps, plan, bool(self.backup_id))
         if self.versions(apps) != reviewed_versions:
             raise UpgradeBlocked("versions_changed")
 
@@ -125,7 +112,7 @@ class NodUpgrade:
             await self.client.store.addon_availability(slug)
         if pending is None:
             pending = {
-                "target": TARGET,
+                "plan": plan.record(),
                 "running": [role for role, app in apps.items() if app.state == "started"],
                 "backup_id": None,
             }
@@ -138,7 +125,7 @@ class NodUpgrade:
                 self.stage = "create backup"
                 backup = await self.client.backups.partial_backup(
                     PartialBackupOptions(
-                        name="Nod before upgrade to 0.10.3",
+                        name=f"Nod before upgrade to {plan.tag.removeprefix('nod-v')}",
                         addons=set(self.slugs.values()),
                         location=".local",
                         password=self.backup_password,
@@ -148,19 +135,19 @@ class NodUpgrade:
                 self.backup_id = backup.slug
                 if not self.backup_id:
                     raise UpgradeBlocked("backup_incomplete")
-                location = await self._check_backup()
+                location = await self._check_backup(plan.baseline)
                 if self.backup_password and not location.protected:
                     raise UpgradeBlocked("backup_not_protected")
                 await self.store.async_save({**pending, "backup_id": self.backup_id})
             else:
-                await self._check_backup()
+                await self._check_backup(plan.baseline)
         except (Exception, asyncio.CancelledError):
             # Before any version change, recover the old services after a failed stop/backup.
             current = await self.inspect()
-            if self.versions(current) == BASELINE:
+            if self.versions(current) == plan.baseline:
                 stage = self.stage
                 try:
-                    await self._start(pending["running"], BASELINE)
+                    await self._start(pending["running"], plan.baseline)
                 finally:
                     self.stage = stage
             raise
@@ -168,25 +155,25 @@ class NodUpgrade:
         for role in UPDATE_ORDER:
             self.stage = f"update / {role}"
             apps = await self.inspect()
-            self.check(apps, {"backup_id": self.backup_id})
+            self.check(apps, plan, has_backup=True)
             if any(app.state != "stopped" for app in apps.values()):
                 raise UpgradeBlocked("versions_changed")
-            if apps[role].installed != TARGET[role]:
+            if apps[role].installed != plan.target[role]:
                 slug = self.slugs[role]
                 await self.client.store.update_addon(slug, StoreAddonUpdate(backup=False, background=False))
                 current = await self.client.addons.addon_info(slug)
-                if current.version != TARGET[role] or current.state != "stopped":
+                if current.version != plan.target[role] or current.state != "stopped":
                     raise UpgradeBlocked("update_failed")
 
         self.stage = "verify versions"
         apps = await self.inspect()
-        if self.versions(apps) != TARGET:
+        if self.versions(apps) != plan.target:
             raise UpgradeBlocked("update_failed")
-        await self._start(pending["running"], TARGET)
+        await self._start(pending["running"], plan.target)
         self.stage = "verify startup"
         apps = await self.inspect()
         for role, app in apps.items():
             expected_state = "started" if role in pending["running"] else "stopped"
-            if app.installed != TARGET[role] or app.state != expected_state:
+            if app.installed != plan.target[role] or app.state != expected_state:
                 raise UpgradeBlocked("start_failed")
         await self.store.async_remove()

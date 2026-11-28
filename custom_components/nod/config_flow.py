@@ -10,9 +10,11 @@ from homeassistant.components.backup import async_get_manager as async_get_backu
 from homeassistant.components.hassio.coordinator import get_addons_list
 from homeassistant.components.hassio.handler import get_supervisor_client
 from homeassistant.exceptions import HomeAssistantError
+from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.storage import Store
 
-from .upgrade import NodUpgrade, TARGET, UpgradeBlocked
+from .release import UpgradeBlocked, fetch_release
+from .upgrade import NodUpgrade
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -68,21 +70,24 @@ class NodOptionsFlow(config_entries.OptionsFlow):
         try:
             apps = await upgrade.inspect()
             pending = await store.async_load()
+            release = await fetch_release(async_get_clientsession(self.hass), upgrade.client, prefix)
+        except UpgradeBlocked as err:
+            return self.async_abort(reason=str(err))
         except Exception as err:
             _LOGGER.warning("Could not inspect Nod upgrade (%s)", type(err).__name__)
             return self.async_abort(reason="upgrade_inspection_failed")
 
         installed = upgrade.versions(apps)
-        if installed == TARGET and not pending:
-            return self.async_abort(reason="up_to_date")
         try:
-            upgrade.check(apps, pending)
+            plan = release.select(installed, pending)
+            upgrade.check(apps, plan, bool(pending and pending.get("backup_id")))
         except UpgradeBlocked as err:
-            return self.async_abort(reason=str(err))
+            backup = pending.get("backup_id") if isinstance(pending, dict) else None
+            return self.async_abort(reason=str(err), description_placeholders={"backup": backup or "—"})
 
         errors = {}
         if user_input and user_input.get("confirm"):
-            if getattr(self, "_reviewed_versions", None) == installed:
+            if getattr(self, "_reviewed_upgrade", None) == (installed, plan):
                 locks = self.hass.data.setdefault("nod_upgrade_locks", {})
                 lock = locks.setdefault(prefix, asyncio.Lock())
                 if lock.locked():
@@ -92,17 +97,17 @@ class NodOptionsFlow(config_entries.OptionsFlow):
                 )
                 self._upgrade_error = None
                 self._upgrade_task = self.hass.async_create_task(
-                    self._run_upgrade(lock, installed), "Nod coordinated upgrade"
+                    self._run_upgrade(lock, installed, plan), "Nod coordinated upgrade"
                 )
                 return await self.async_step_upgrade_progress()
             errors["base"] = "versions_changed"
 
-        self._reviewed_versions = installed
-        summary = ", ".join(f"{role} {version} → {TARGET[role]}" for role, version in installed.items())
+        self._reviewed_upgrade = (installed, plan)
+        summary = ", ".join(f"{role} {version} → {plan.target[role]}" for role, version in installed.items())
         return self.async_show_form(
             step_id="upgrade",
             data_schema=vol.Schema({vol.Required("confirm", default=False): bool}),
-            description_placeholders={"versions": summary},
+            description_placeholders={"versions": summary, "upstream": plan.tag.removeprefix("nod-v")},
             errors=errors,
         )
 
@@ -118,13 +123,13 @@ class NodOptionsFlow(config_entries.OptionsFlow):
             return None
         return config.create_backup.password
 
-    async def _run_upgrade(self, lock, installed):
+    async def _run_upgrade(self, lock, installed, plan):
         if lock.locked():
             self._upgrade_error = "upgrade_running"
             return
         async with lock:
             try:
-                await self._upgrade.run(installed)
+                await self._upgrade.run(installed, plan)
             except UpgradeBlocked as err:
                 self._upgrade_error = str(err)
             except Exception as err:
