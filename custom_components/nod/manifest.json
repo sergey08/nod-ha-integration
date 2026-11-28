@@ -14,5 +14,5 @@
   "documentation": "https://github.com/sergey08/nod-ha-integration",
   "integration_type": "hub",
   "iot_class": "local_polling",
-  "version": "0.1.0b9"
+  "version": "0.1.0b10"
 }
